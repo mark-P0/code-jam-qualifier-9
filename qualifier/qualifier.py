@@ -31,6 +31,12 @@ class Request:
 
         return request_type
 
+    @property
+    def id(self):
+        request_id = self.scope.get("id")
+
+        return request_id
+
 
 class RestaurantStaffClass:
     """
@@ -45,17 +51,14 @@ class RestaurantStaffClass:
 
     def __iter__(self):
         for staff in self.staff:
-            request_id = staff.scope.get("id")
-            if request_id is None:
+            if staff.id is None:
                 raise ValueError("Some staff does not have an ID")
 
-            yield request_id, staff
+            yield (staff.id, staff)
 
     def __getitem__(self, key):
         for staff in self.staff:
-            request_id = staff.scope.get("id")
-
-            if key == request_id:
+            if key == staff.id:
                 return staff
 
 
@@ -67,14 +70,10 @@ class RestaurantStaff(RestaurantStaffClass):
         self.staff.append(staff_request)
 
     def remove(self, staff_request: Request):
-        request_id = staff_request.scope.get("id")
-
         if staff_request.type != RequestType.STAFF_OFF_DUTY:
             raise ValueError("Cannot remove staff with invalid request type")
 
-        self.staff = [
-            staff for staff in self.staff if staff.scope.get("id") != request_id
-        ]
+        self.staff = [staff for staff in self.staff if staff.id != staff_request.id]
 
     def get_specialized(self, request: Request):
         speciality = request.scope.get("speciality")
