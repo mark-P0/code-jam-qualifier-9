@@ -17,6 +17,63 @@ class Request:
     send: typing.Callable[[object], typing.Awaitable[None]]
 
 
+class RestaurantStaffClass:
+    """
+    Allow simple dictionary conversion
+    """
+
+    def __init__(self):
+        """
+        Staff are represented as a Request object
+        """
+        self.staff: list[Request] = []
+
+    def __iter__(self):
+        for staff in self.staff:
+            request_id = staff.scope.get("id")
+            if request_id is None:
+                raise ValueError("Some staff does not have an ID")
+
+            yield request_id, staff
+
+    def __getitem__(self, key):
+        for staff in self.staff:
+            request_id = staff.scope.get("id")
+
+            if key == request_id:
+                return staff
+
+
+class RestaurantStaff(RestaurantStaffClass):
+    def add(self, staff_request: Request):
+        request_type = staff_request.scope.get("type")
+        if request_type != RequestType.STAFF_ON_DUTY.value:
+            raise ValueError("Cannot add staff with invalid request type")
+
+        self.staff.append(staff_request)
+
+    def remove(self, staff_request: Request):
+        request_type = staff_request.scope.get("type")
+        request_id = staff_request.scope.get("id")
+
+        if request_type != RequestType.STAFF_OFF_DUTY.value:
+            raise ValueError("Cannot remove staff with invalid request type")
+
+        self.staff = [
+            staff for staff in self.staff if staff.scope.get("id") != request_id
+        ]
+
+    def get_specialized(self, request: Request):
+        speciality = request.scope.get("speciality")
+
+        for staff in self.staff:
+            staff_specialities = staff.scope.get("speciality", [])
+            if speciality in staff_specialities:
+                return staff
+
+        return None
+
+
 class RestaurantManager:
     def __init__(self):
         """Instantiate the restaurant manager.
@@ -26,16 +83,14 @@ class RestaurantManager:
         to get the system working before the day starts here; we have
         already defined a staff dictionary.
         """
-        self.staff = {}
 
-    def __get_staff_with_speciality(self, speciality):
-        for _, staff_request in self.staff.items():
-            staff_specialities = staff_request.scope.get("speciality")
+        self.__staff = RestaurantStaff()
 
-            if speciality in staff_specialities:
-                return staff_request
+    @property
+    def staff(self) -> dict[str, Request]:
+        staff_dict = dict(self.__staff)
 
-        return None
+        return staff_dict
 
     async def __call__(self, request: Request):
         """Handle a request received.
@@ -50,17 +105,15 @@ class RestaurantManager:
         ...
 
         request_type = request.scope.get("type")
-        request_id = request.scope.get("id")
 
         if request_type == RequestType.STAFF_ON_DUTY.value:
-            self.staff[request_id] = request
+            self.__staff.add(request)
 
         if request_type == RequestType.STAFF_OFF_DUTY.value:
-            self.staff.pop(request_id, None)
+            self.__staff.remove(request)
 
         if request_type == RequestType.ORDER.value:
-            request_speciality = request.scope.get("speciality")
-            staff = self.__get_staff_with_speciality(request_speciality)
+            staff = self.__staff.get_specialized(request)
 
             if staff is None:
                 raise ValueError(f"No staff can handle request: {request}")
