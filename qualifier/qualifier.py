@@ -8,6 +8,14 @@ class RequestType(Enum):
     STAFF_OFF_DUTY = "staff.offduty"
     ORDER = "order"
 
+    @classmethod
+    def from_value(cls, value):
+        for member in cls:
+            if value == member.value:
+                return member
+
+        return None
+
 
 @dataclass(frozen=True)
 class Request:
@@ -15,6 +23,13 @@ class Request:
 
     receive: typing.Callable[[], typing.Awaitable[object]]
     send: typing.Callable[[object], typing.Awaitable[None]]
+
+    @property
+    def type(self):
+        request_type_raw = self.scope.get("type")
+        request_type = RequestType.from_value(request_type_raw)
+
+        return request_type
 
 
 class RestaurantStaffClass:
@@ -46,17 +61,15 @@ class RestaurantStaffClass:
 
 class RestaurantStaff(RestaurantStaffClass):
     def add(self, staff_request: Request):
-        request_type = staff_request.scope.get("type")
-        if request_type != RequestType.STAFF_ON_DUTY.value:
+        if staff_request.type != RequestType.STAFF_ON_DUTY:
             raise ValueError("Cannot add staff with invalid request type")
 
         self.staff.append(staff_request)
 
     def remove(self, staff_request: Request):
-        request_type = staff_request.scope.get("type")
         request_id = staff_request.scope.get("id")
 
-        if request_type != RequestType.STAFF_OFF_DUTY.value:
+        if staff_request.type != RequestType.STAFF_OFF_DUTY:
             raise ValueError("Cannot remove staff with invalid request type")
 
         self.staff = [
@@ -104,15 +117,13 @@ class RestaurantManager:
         """
         ...
 
-        request_type = request.scope.get("type")
-
-        if request_type == RequestType.STAFF_ON_DUTY.value:
+        if request.type == RequestType.STAFF_ON_DUTY:
             self.__staff.add(request)
 
-        if request_type == RequestType.STAFF_OFF_DUTY.value:
+        if request.type == RequestType.STAFF_OFF_DUTY:
             self.__staff.remove(request)
 
-        if request_type == RequestType.ORDER.value:
+        if request.type == RequestType.ORDER:
             staff = self.__staff.get_specialized(request)
 
             if staff is None:
@@ -123,3 +134,7 @@ class RestaurantManager:
 
             order_result = await staff.receive()
             await request.send(order_result)
+
+
+if __name__ == "__main__":
+    ...
