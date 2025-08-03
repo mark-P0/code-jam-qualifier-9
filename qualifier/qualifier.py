@@ -37,6 +37,12 @@ class Request:
 
         return request_id
 
+    @property
+    def speciality(self):
+        request_speciality = self.scope.get("speciality")
+
+        return request_speciality
+
 
 class RestaurantStaffClass:
     """
@@ -76,11 +82,9 @@ class RestaurantStaff(RestaurantStaffClass):
         self.staff = [staff for staff in self.staff if staff.id != staff_request.id]
 
     def get_specialized(self, request: Request):
-        speciality = request.scope.get("speciality")
-
         for staff in self.staff:
-            staff_specialities = staff.scope.get("speciality", [])
-            if speciality in staff_specialities:
+            staff_specialities = staff.speciality or []
+            if request.speciality in staff_specialities:
                 return staff
 
         return None
