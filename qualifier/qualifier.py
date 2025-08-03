@@ -44,7 +44,7 @@ class Request:
         return request_speciality
 
 
-class RestaurantStaffClass:
+class RestaurantStaffDict:
     """
     Allow simple dictionary conversion
     """
@@ -68,7 +68,7 @@ class RestaurantStaffClass:
                 return staff
 
 
-class RestaurantStaff(RestaurantStaffClass):
+class RestaurantStaff(RestaurantStaffDict):
     def add(self, request: Request):
         if request.type != RequestType.STAFF_ON_DUTY:
             raise ValueError("Request is not for adding staff")
