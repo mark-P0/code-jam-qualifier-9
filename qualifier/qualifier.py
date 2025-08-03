@@ -1,5 +1,12 @@
 import typing
 from dataclasses import dataclass
+from enum import Enum
+
+
+class RequestType(Enum):
+    STAFF_ON_DUTY = "staff.onduty"
+    STAFF_OFF_DUTY = "staff.offduty"
+    ORDER = "order"
 
 
 @dataclass(frozen=True)
@@ -21,6 +28,15 @@ class RestaurantManager:
         """
         self.staff = {}
 
+    def __get_staff_with_speciality(self, speciality):
+        for _, staff_request in self.staff.items():
+            staff_specialities = staff_request.scope.get("speciality")
+
+            if speciality in staff_specialities:
+                return staff_request
+
+        return None
+
     async def __call__(self, request: Request):
         """Handle a request received.
 
@@ -32,3 +48,25 @@ class RestaurantManager:
             request to your application.
         """
         ...
+
+        request_type = request.scope.get("type")
+        request_id = request.scope.get("id")
+
+        if request_type == RequestType.STAFF_ON_DUTY.value:
+            self.staff[request_id] = request
+
+        if request_type == RequestType.STAFF_OFF_DUTY.value:
+            self.staff.pop(request_id, None)
+
+        if request_type == RequestType.ORDER.value:
+            request_speciality = request.scope.get("speciality")
+            staff = self.__get_staff_with_speciality(request_speciality)
+
+            if staff is None:
+                raise ValueError(f"No staff can handle request: {request}")
+
+            order = await request.receive()
+            await staff.send(order)
+
+            order_result = await staff.receive()
+            await request.send(order_result)
