@@ -69,17 +69,17 @@ class RestaurantStaffClass:
 
 
 class RestaurantStaff(RestaurantStaffClass):
-    def add(self, staff_request: Request):
-        if staff_request.type != RequestType.STAFF_ON_DUTY:
-            raise ValueError("Cannot add staff with invalid request type")
+    def add(self, request: Request):
+        if request.type != RequestType.STAFF_ON_DUTY:
+            raise ValueError("Request is not for adding staff")
 
-        self.staff.append(staff_request)
+        self.staff.append(request)
 
-    def remove(self, staff_request: Request):
-        if staff_request.type != RequestType.STAFF_OFF_DUTY:
-            raise ValueError("Cannot remove staff with invalid request type")
+    def remove(self, request: Request):
+        if request.type != RequestType.STAFF_OFF_DUTY:
+            raise ValueError("Request is not for removing staff")
 
-        self.staff = [staff for staff in self.staff if staff.id != staff_request.id]
+        self.staff = [staff for staff in self.staff if staff.id != request.id]
 
     def get_specialized(self, request: Request):
         for staff in self.staff:
@@ -108,6 +108,20 @@ class RestaurantManager:
 
         return staff_dict
 
+    async def __perform_order(self, request: Request):
+        if request.type != RequestType.ORDER:
+            raise ValueError("Request is not an order")
+
+        staff = self.__staff.get_specialized(request)
+        if staff is None:
+            raise ValueError("No specialized staff")
+
+        order = await request.receive()
+        await staff.send(order)
+
+        order_result = await staff.receive()
+        await request.send(order_result)
+
     async def __call__(self, request: Request):
         """Handle a request received.
 
@@ -127,16 +141,7 @@ class RestaurantManager:
             self.__staff.remove(request)
 
         if request.type == RequestType.ORDER:
-            staff = self.__staff.get_specialized(request)
-
-            if staff is None:
-                raise ValueError(f"No staff can handle request: {request}")
-
-            order = await request.receive()
-            await staff.send(order)
-
-            order_result = await staff.receive()
-            await request.send(order_result)
+            await self.__perform_order(request)
 
 
 if __name__ == "__main__":
